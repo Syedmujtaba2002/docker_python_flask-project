@@ -30,7 +30,16 @@ jobs:
         sleep 5
         curl -I http://127.0.0.1:5000/
 
-    - name: Deploy via SSH
+    - name: Upload code to remote server
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_KEY }}
+        source: "."
+        target: "/home/${{ secrets.SSH_USER }}/flaskapp"
+
+    - name: Restart Flask app remotely
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.SSH_HOST }}
@@ -38,29 +47,7 @@ jobs:
         key: ${{ secrets.SSH_KEY }}
         script: |
           pkill -f "python app.py" || true
-          mkdir -p ~/flaskapp
-          rm -rf ~/flaskapp/*
-          echo "Uploading new files..."
-          exit 0  # placeholder – rsync comes next
-
-    - name: Upload app files via rsync
-      uses: burnett01/rsync-deployments@v1.1
-      with:
-        switches: -avzr --delete
-        path: ./
-        remote_path: /home/ubuntu/flaskapp/
-        remote_host: ${{ secrets.SSH_HOST }}
-        remote_user: ${{ secrets.SSH_USER }}
-        remote_key: ${{ secrets.SSH_KEY }}
-
-    - name: Restart Flask app on server
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USER }}
-        key: ${{ secrets.SSH_KEY }}
-        script: |
           cd ~/flaskapp
           nohup python3 app.py > output.log 2>&1 &
-          echo "Flask app restarted!"
+          echo "✅ Flask app restarted successfully"
 
