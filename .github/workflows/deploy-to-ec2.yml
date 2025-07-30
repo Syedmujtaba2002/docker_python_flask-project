@@ -10,7 +10,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to EC2 using SSH
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Deploy to EC2 with SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -18,41 +21,38 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           script: |
-            echo "🔁 Stopping existing service if exists"
+            echo "🔁 Stop previous service if exists"
             sudo systemctl stop flaskapp.service || true
 
-            echo "📥 Pulling latest code"
-            rm -rf ~/flaskapp
-            git clone https://github.com/Syedmujtaba2002/docker_python_flask-project.git ~/flaskapp
+            echo "📥 Clone latest code"
+            rm -rf /home/ubuntu/flaskapp
+            git clone https://github.com/Syedmujtaba2002/docker_python_flask-project.git /home/ubuntu/flaskapp
 
-            echo "📦 Creating virtual environment"
-            cd ~/flaskapp
+            echo "🔧 Setup Python virtual environment"
+            cd /home/ubuntu/flaskapp
             sudo apt update -y
             sudo apt install -y python3-venv
             python3 -m venv venv
             source venv/bin/activate
-            pip install --upgrade pip
             pip install -r requirements.txt
 
-            echo "🧾 Writing systemd unit file"
-            sudo bash -c 'cat > /etc/systemd/system/flaskapp.service <<EOF
+            echo "🧾 Create systemd service file"
+            sudo tee /etc/systemd/system/flaskapp.service > /dev/null <<EOF
 [Unit]
-Description=Flask App
+Description=Flask App Service
 After=network.target
 
 [Service]
 User=ubuntu
 WorkingDirectory=/home/ubuntu/flaskapp
-ExecStart=/home/ubuntu/flaskapp/venv/bin/python3 /home/ubuntu/flaskapp/app.py
+ExecStart=/home/ubuntu/flaskapp/venv/bin/python app.py
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
-EOF'
+EOF
 
-            echo "🔁 Reloading systemd"
+            echo "🚀 Start systemd service"
             sudo systemctl daemon-reload
             sudo systemctl enable flaskapp
             sudo systemctl restart flaskapp
-
-            echo "✅ Flask App is now running as a systemd service!"
