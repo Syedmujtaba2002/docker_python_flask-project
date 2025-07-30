@@ -13,7 +13,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Deploy to EC2
+      - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -21,36 +21,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           script: |
-            echo "🔁 Stop previous service if exists"
-            sudo systemctl stop flaskapp.service || true
-
-            echo "📥 Clone latest code"
-            rm -rf /home/ubuntu/flaskapp
-            git clone https://github.com/Syedmujtaba2002/docker_python_flask-project.git /home/ubuntu/flaskapp
-
-            echo "🔧 Setup Python virtual environment"
-            cd /home/ubuntu/flaskapp
-            sudo apt update -y
-            sudo apt install -y python3-venv
-            python3 -m venv venv
-            source venv/bin/activate
-            pip install -r requirements.txt
-
-            echo "🧾 Creating systemd service file"
-            sudo bash -c 'echo "[Unit]
-Description=Flask App Service
-After=network.target
-
-[Service]
-User=ubuntu
-WorkingDirectory=/home/ubuntu/flaskapp
-ExecStart=/home/ubuntu/flaskapp/venv/bin/python app.py
-Restart=always
-
-[Install]
-WantedBy=multi-user.target" > /etc/systemd/system/flaskapp.service'
-
-            echo "🚀 Reloading and starting systemd service"
-            sudo systemctl daemon-reload
-            sudo systemctl enable flaskapp
-            sudo systemctl restart flaskapp
+            echo "➡️ Running deploy.sh from GitHub repo"
+            curl -o deploy.sh https://raw.githubusercontent.com/Syedmujtaba2002/docker_python_flask-project/main/deploy.sh
+            chmod +x deploy.sh
+            ./deploy.sh
