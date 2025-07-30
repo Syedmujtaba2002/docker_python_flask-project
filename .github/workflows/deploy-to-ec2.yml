@@ -7,19 +7,19 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to EC2
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Deploy via SSH
+      - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
           script: |
             pkill -f app.py || true
             rm -rf flaskapp
@@ -31,4 +31,6 @@ jobs:
             source venv/bin/activate
             pip install --upgrade pip
             pip install -r requirements.txt
-            nohup python app.py > flask.log 2>&1 &
+            nohup python app.py > flask.log 2>&1 & disown
+            sleep 5
+            echo "✅ Flask app deployed successfully!"
