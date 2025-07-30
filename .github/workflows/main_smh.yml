@@ -1,29 +1,28 @@
-name: Deploy Flask App
+name: Start Flask app on remote server
 
 on:
   push:
     branches:
-      - main  # or your branch name
+      - main
 
 jobs:
   deploy:
-    name: 🚀 Deploy to Remote Server
     runs-on: ubuntu-latest
 
     steps:
-      - name: 🧾 Checkout Repository
-        uses: actions/checkout@v3
-
-      - name: 🚀 Start Flask app on remote server
+      - name: 🔐 SSH into EC2 and run Flask app
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: 22
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
           script: |
+            echo "🛠️ Updating apt and installing tmux..."
+            sudo apt update && sudo apt install tmux -y
+
             echo "🔍 Killing old Flask process (if any)..."
             pkill -f "python3 app.py" || echo "No existing Flask app running."
+            tmux kill-session -t flaskapp || echo "No previous tmux session"
 
             echo "📁 Changing to project directory..."
             cd ~/flaskapp || exit 1
@@ -31,8 +30,8 @@ jobs:
             echo "📦 Installing Python dependencies..."
             if [ -f requirements.txt ]; then pip3 install -r requirements.txt; else echo 'No requirements.txt found'; fi
 
-            echo "🚀 Starting Flask app in background..."
-            nohup python3 app.py > output.log 2>&1 &
+            echo "🚀 Starting Flask app inside tmux..."
+            tmux new-session -d -s flaskapp 'cd ~/flaskapp && python3 app.py > output.log 2>&1'
 
             sleep 3
             echo "📄 Showing last 10 lines of output.log..."
