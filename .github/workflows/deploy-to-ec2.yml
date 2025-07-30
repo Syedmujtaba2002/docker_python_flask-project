@@ -18,15 +18,15 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           script: |
-            echo "🔁 Stopping systemd service"
-            sudo systemctl stop flaskapp || true
+            echo "🔁 Stopping existing service if exists"
+            sudo systemctl stop flaskapp.service || true
 
-            echo "📥 Updating project"
+            echo "📥 Pulling latest code"
             rm -rf ~/flaskapp
             git clone https://github.com/Syedmujtaba2002/docker_python_flask-project.git ~/flaskapp
-            cd ~/flaskapp
 
-            echo "🔧 Setting up virtualenv"
+            echo "📦 Creating virtual environment"
+            cd ~/flaskapp
             sudo apt update -y
             sudo apt install -y python3-venv
             python3 -m venv venv
@@ -34,27 +34,25 @@ jobs:
             pip install --upgrade pip
             pip install -r requirements.txt
 
-            echo "🧾 Creating systemd service"
-            SERVICE_FILE=/etc/systemd/system/flaskapp.service
-            sudo bash -c "cat > \$SERVICE_FILE" <<EOF
-            [Unit]
-            Description=Flask App
-            After=network.target
+            echo "🧾 Writing systemd unit file"
+            sudo tee /etc/systemd/system/flaskapp.service > /dev/null <<EOF
+[Unit]
+Description=Flask App
+After=network.target
 
-            [Service]
-            User=ubuntu
-            WorkingDirectory=/home/ubuntu/flaskapp
-            ExecStart=/home/ubuntu/flaskapp/venv/bin/python3 /home/ubuntu/flaskapp/app.py
-            Restart=always
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/flaskapp
+ExecStart=/home/ubuntu/flaskapp/venv/bin/python3 /home/ubuntu/flaskapp/app.py
+Restart=always
 
-            [Install]
-            WantedBy=multi-user.target
-            EOF
+[Install]
+WantedBy=multi-user.target
+EOF
 
-            echo "🔁 Restarting systemd"
-            sudo systemctl daemon-reexec
+            echo "🔁 Reloading systemd"
             sudo systemctl daemon-reload
             sudo systemctl enable flaskapp
             sudo systemctl restart flaskapp
 
-            echo "✅ Flask App deployed and managed via systemd"
+            echo "✅ Flask App is now running as a systemd service!"
