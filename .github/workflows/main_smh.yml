@@ -1,4 +1,4 @@
-name: Flask App CI/CD with SSH (No Restart)
+name: Flask App CI/CD with SSH
 
 on:
   push:
@@ -38,3 +38,15 @@ jobs:
         key: ${{ secrets.SSH_KEY }}
         source: "."
         target: "/home/${{ secrets.SSH_USER }}/flaskapp"
+
+    - name: Start Flask app on remote server
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          pkill -f "python3 app.py" || true
+          cd ~/flaskapp
+          nohup python3 app.py > output.log 2>&1 &
+          echo "🚀 Flask app started on remote server"
