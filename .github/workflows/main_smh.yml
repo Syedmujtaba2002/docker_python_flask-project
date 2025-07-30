@@ -44,7 +44,7 @@ jobs:
           exit 0  # placeholder – rsync comes next
 
     - name: Upload app files via rsync
-      uses: burnett01/rsync-deployments@v1.0.0
+      uses: burnett01/rsync-deployments@v1.1
       with:
         switches: -avzr --delete
         path: ./
