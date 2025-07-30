@@ -10,10 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Deploy to EC2 via SSH
+      - name: Deploy to EC2 using SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -21,16 +18,25 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           script: |
+            echo "🔁 Killing previous Flask process"
             pkill -f app.py || true
-            rm -rf flaskapp
-            git clone https://github.com/Syedmujtaba2002/docker_python_flask-project.git flaskapp
-            cd flaskapp
+
+            echo "🧹 Cleaning old project folder"
+            rm -rf ~/flaskapp
+
+            echo "📥 Cloning latest code"
+            git clone https://github.com/Syedmujtaba2002/docker_python_flask-project.git ~/flaskapp
+            cd ~/flaskapp
+
+            echo "🔧 Installing dependencies"
             sudo apt update -y
             sudo apt install python3-venv -y
             python3 -m venv venv
             source venv/bin/activate
             pip install --upgrade pip
             pip install -r requirements.txt
-            nohup python app.py > flask.log 2>&1 & disown
-            sleep 5
-            echo "✅ Flask app deployed successfully!"
+
+            echo "🚀 Starting Flask app"
+            nohup python3 app.py > output.log 2>&1 & disown
+
+            echo "✅ Deployment complete"
