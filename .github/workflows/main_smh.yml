@@ -1,74 +1,66 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-# More info on Python, GitHub Actions, and Azure App Service: https://aka.ms/python-webapps-actions
-
-name: Build and Deploy Python App to EC2
+name: Flask App CI/CD with SSH
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
+    branches: [ main ]
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'  # <-- CHANGE THIS if using a different Python version
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
 
-      - name: Install dependencies
-        run: |
-          python -m venv venv
-          source venv/bin/activate
-          pip install -r requirements.txt
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Zip app for deployment
-        run: |
-          zip -r app.zip . -x "venv/*"
+    - name: Test Flask app locally
+      env:
+        FLASK_APP: app.py
+      run: |
+        nohup python app.py &
+        sleep 5
+        curl -I http://127.0.0.1:5000/
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-app
-          path: app.zip
+    - name: Deploy via SSH
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          pkill -f "python app.py" || true
+          mkdir -p ~/flaskapp
+          rm -rf ~/flaskapp/*
+          echo "Uploading new files..."
+          exit 0  # placeholder – rsync comes next
 
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
+    - name: Upload app files via rsync
+      uses: burnett01/rsync-deployments@v1.0.0
+      with:
+        switches: -avzr --delete
+        path: ./
+        remote_path: /home/ubuntu/flaskapp/
+        remote_host: ${{ secrets.SSH_HOST }}
+        remote_user: ${{ secrets.SSH_USER }}
+        remote_key: ${{ secrets.SSH_KEY }}
 
-    steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: python-app
+    - name: Restart Flask app on server
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          cd ~/flaskapp
+          nohup python3 app.py > output.log 2>&1 &
+          echo "Flask app restarted!"
 
-      - name: Set up SSH key
-        run: |
-          echo "${{ secrets.EC2_KEY }}" > key.pem  # <-- CHANGE THIS: your EC2 private key must be added as GitHub secret `EC2_KEY`
-          chmod 600 key.pem
-
-      - name: Copy files to EC2
-        run: |
-          scp -o StrictHostKeyChecking=no -i key.pem app.zip ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:${{ secrets.EC2_APP_DIR }}
-          # <-- CHANGE `EC2_USER`, `EC2_HOST`, `EC2_APP_DIR` secrets accordingly
-
-      - name: SSH into EC2 and deploy
-        run: |
-          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            cd ${{ secrets.EC2_APP_DIR }}  # <-- CHANGE THIS: make sure this path exists on EC2
-            unzip -o app.zip
-            source venv/bin/activate || python3 -m venv venv && source venv/bin/activate
-            pip install -r requirements.txt
-            sudo systemctl restart myapp.service  # <-- CHANGE THIS: your app’s systemd service name on EC2
-          EOF
-
-        with:
-          app-name: 'smh'
-          slot-name: 'Production'
-          
