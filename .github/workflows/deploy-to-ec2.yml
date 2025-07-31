@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: SSH and Deploy on Remote Server
+    - name: Deploy to Remote Server via SSH
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.HOST }}
@@ -18,19 +18,22 @@ jobs:
         key: ${{ secrets.KEY }}
         port: ${{ secrets.PORT }}
         script: |
-          # Ensure Docker is installed
+          # Install Docker if not installed
           docker --version || curl -fsSL https://get.docker.com | sh
 
-          # Clean old app if exists
-          sudo rm -rf flaskapp || true
+          # Remove old project directory if exists
+          rm -rf flaskapp || true
+
+          # Clone latest code
           git clone https://github.com/Syedmujtaba2002/docker_python_flask-project.git flaskapp
           cd flaskapp
 
-          # Stop and remove old container
-          docker stop flaskapp || true
-          docker rm flaskapp || true
+          # Stop and remove existing Docker container if running
+          sudo docker stop flaskapp || true
+          sudo docker rm flaskapp || true
 
-          # Build and run the Docker container
-          docker build -t flaskapp .
-          docker run -d --name flaskapp -p 5000:5000 flaskapp
+          # Build Docker image
+          sudo docker build -t flaskapp .
 
+          # Run new container
+          sudo docker run -d --name flaskapp -p 5000:5000 flaskapp
