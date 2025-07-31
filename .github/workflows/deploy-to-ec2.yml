@@ -1,4 +1,4 @@
-name: Deploy Flask App to EC2 via systemd
+name: Deploy Flask App with Docker (No Docker Hub)
 
 on:
   push:
@@ -10,18 +10,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+    - name: SSH and Deploy on Remote Server
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.KEY }}
+        port: ${{ secrets.PORT }}
+        script: |
+          # Ensure Docker is installed
+          docker --version || curl -fsSL https://get.docker.com | sh
 
-      - name: Deploy to EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          script: |
-            echo "➡️ Running deploy.sh from GitHub repo"
-            curl -o deploy.sh https://raw.githubusercontent.com/Syedmujtaba2002/docker_python_flask-project/main/deploy.sh
-            chmod +x deploy.sh
-            ./deploy.sh
+          # Clean old app if exists
+          sudo rm -rf flaskapp || true
+          git clone https://github.com/Syedmujtaba2002/docker_python_flask-project.git flaskapp
+          cd flaskapp
+
+          # Stop and remove old container
+          docker stop flaskapp || true
+          docker rm flaskapp || true
+
+          # Build and run the Docker container
+          docker build -t flaskapp .
+          docker run -d --name flaskapp -p 5000:5000 flaskapp
+
